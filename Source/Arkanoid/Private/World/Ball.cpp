@@ -32,12 +32,68 @@ void ABall::BeginPlay()
 {
 	Super::BeginPlay();
 
+	SetActorScale3D(FVector(InitParameters.Scale));
 	
+	Power = InitParameters.Power;
+	Speed = InitParameters.Speed;
+	Direction = GetActorForwardVector().GetSafeNormal();
+	
+	SetBallState(EBallState::Moving);
 }
 
-// Called every frame
+// Вызывается каждый кадр
 void ABall::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	// Используем switch для обработки состояния только для примера
+	switch (State)
+	{
+	case EBallState::Idle:
+		break;
+	case EBallState::Moving:
+			Move(DeltaTime);
+		break;
+	default:
+			// Действия по умолчанию, если состояние не определено
+			UE_LOG(LogTemp, Error, TEXT("Unknown Ball State"));
+		break;
+	}
+}
+
+void ABall::Move(const float DeltaTime)
+{
+	const FVector Offset = Direction * Speed * DeltaTime;
+	FHitResult HitResult;
+	AddActorWorldOffset(Offset, true, &HitResult); // true для проверки столкновений
+
+	// Проверяем столкновения
+	if (HitResult.bBlockingHit)
+	{
+		/*
+			Формула для вычисления отраженного вектора выглядит так:
+			ReflectedDirection = Direction − 2 * (Direction ⋅ Normal) * Normal
+			(в выражении (Direction ⋅ Normal) используется скалярное произведение!)
+		*/
+		Direction = Direction - 2 * (FVector::DotProduct(Direction, HitResult.Normal)) * HitResult.Normal;
+		Direction.Z = 0.f;
+		Direction = Direction.GetSafeNormal(); // Нормализуем вектор
+
+		// Увеличиваем скорость, если она меньше максимальной
+		if (Speed < InitParameters.MaxSpeed)
+		{
+			Speed += InitParameters.Speed * 0.1f;
+			Speed = FMath::Min(Speed, InitParameters.MaxSpeed); // Ограничиваем скорость максимальным значением
+		}
+
+		// выведем скорость для дебага
+		// https://www.chrismccole.com/blog/logging-in-ue4-cpp
+		// https://unrealcommunity.wiki/logging-lgpidy6i
+		UE_LOG(LogTemp, Error, TEXT("Ball speed %f"), Speed);
+	}
+}
+
+void ABall::SetBallState(const EBallState NewState)
+{
+	State = NewState;
 }
